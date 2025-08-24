@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>九宫格标注</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <style>
+    .container { text-align: center; max-width: 720px; margin: 10px auto; }
+    #id-input-area { margin: 30px 0; }
+    #tip { font-size: 16px; font-weight: bold; margin: 6px 0; }
+    #progress { font-size: 14px; color: #555; margin-bottom: 8px; }
+    #message { color: #b00; font-size: 14px; min-height: 1.2em; margin-top: 6px; }
+    #time_message { color: #b00; font-size: 14px; min-height: 1.2em; margin-top: 6px; }
+    canvas { width: 100%; height: auto; border: 1px solid #ccc; touch-action: manipulation; }
+    .btns { margin-top: 10px; display: flex; gap: 10px; justify-content: center; }
+    button { padding: 8px 14px; font-size: 16px; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <!-- 学号输入 -->
+  <div id="id-input-area">
+    <label for="userIdInput">请输入学号开始标注：</label>
+    <input type="text" id="userIdInput" placeholder="学号" style="padding:6px 10px; font-size:16px;" />
+    <button onclick="startAnnotation()">开始</button>
+  </div>
+
+  <!-- 主界面 -->
+  <div id="main-app" style="display:none;">
+    <div id="tip">请选择所有包含目标的格子（九宫格）。全部正确后才能进入下一张。</div>
+    <div id="progress"></div>
+    <div id="time_message">剩余时间: XX秒</div>
+    <canvas id="canvas"></canvas>
+
+    <div class="btns">
+      <button onclick="resetSelection()">重置选择</button>
+      <button id="submitBtn" onclick="submitSelection()">确定 / 下一张</button>
+    </div>
+
+    <div id="message"></div>
+    <div id="noTargetHint" style="display:none; color:#555; margin-top:6px;">本图无目标，请不要选择任何格子，直接点击“确定 / 下一张”。</div>
+    <div class="btns" id="noTargetActions" style="display:none; margin-top:6px;">
+      <button onclick="markNoTarget()">本图无目标（清空并提交）</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let user_id = '';
+let canvas = document.getElementById('canvas');
+let ctx = canvas.getContext('2d');
+let img = new Image();
+
+let image_name = '';
+let current = 0, total = 0;
+let selectedCells = new Set();
+let hasTarget = true;
+const rows = 3, cols = 3;
+
+let countdownTimer;
+let timeLeft = 10; // 10秒倒计时
+let timerDisplay = document.getElementById('time_message'); // 显示剩余时间
+
+function startCountdown() {
+  timeLeft = 10;
+  if (countdownTimer) clearInterval(countdownTimer);
+  countdownTimer = setInterval(() => {
+    if (timeLeft <= 0) {
+      clearInterval(countdownTimer);
+      timerDisplay.innerText = '时间到，自动跳转至下一张图片';
+
+      fetch(`/timeout?user=${encodeURIComponent(user_id)}`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ image_name: image_name })
+      }).then(res => res.json())
+        .then(() => {
+          loadNext();
+        });
+
+    } else {
+      timerDisplay.innerText = `剩余时间: ${timeLeft}秒`;
+      timeLeft--;
+    }
+  }, 1000);
+}
+
+function startAnnotation() {
+  const input = document.getElementById('userIdInput');
+  if (!input.value.trim()) { alert('请输入学号！'); return; }
+  user_id = input.value.trim();
+
+  document.getElementById('id-input-area').style.display = 'none';
+  document.getElementById('main-app').style.display = 'block';
+  loadNext();
+}
+
+function draw() {
+  canvas.width = img.width;
+  canvas.height = img.height;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+  const cw = canvas.width, ch = canvas.height;
+  const cellW = Math.floor(cw / cols);
+  const cellH = Math.floor(ch / rows);
+
+  selectedCells.forEach(idx => {
+    const r = Math.floor(idx / cols);
+    const c = idx % cols;
+    const x = c * cellW;
+    const y = r * cellH;
+    ctx.fillStyle = 'rgba(0, 150, 255, 0.25)';
+    ctx.fillRect(x, y, (c === cols - 1 ? cw - x : cellW), (r === rows - 1 ? ch - y : cellH));
+  });
+
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+  for (let r = 1; r < rows; r++) {
+    const y = r * cellH;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(cw, y); ctx.stroke();
+  }
+  for (let c = 1; c < cols; c++) {
+    const x = c * cellW;
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, ch); ctx.stroke();
+  }
+
+  ctx.fillStyle = 'rgba(0,0,0,0.7)';
+  ctx.font = Math.floor(Math.min(canvas.width, canvas.height) / 18) + 'px sans-serif';
+  ctx.textBaseline = 'top';
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const x = c * cellW + 6;
+      const y = r * cellH + 4;
+      const idx = r * cols + c;
+      ctx.fillText(String(idx), x, y);
+    }
+  }
+}
+
+function handleSelect(x, y) {
+  const cellW = Math.floor(canvas.width / cols);
+  const cellH = Math.floor(canvas.height / rows);
+  const c = Math.min(cols - 1, Math.floor(x / cellW));
+  const r = Math.min(rows - 1, Math.floor(y / cellH));
+  const idx = r * cols + c;
+
+  if (selectedCells.has(idx)) {
+    selectedCells.delete(idx);
+  } else {
+    selectedCells.add(idx);
+  }
+  document.getElementById('message').innerText = '';
+  draw();
+}
+
+// ✅ 电脑端点击
+canvas.addEventListener('click', e => {
+  const rect = canvas.getBoundingClientRect();
+  const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+  const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+  handleSelect(x, y);
+}, { passive: true });
+
+// ✅ 手机端点击
+canvas.addEventListener('touchstart', e => {
+  if (e.touches && e.touches[0]) {
+    e.preventDefault(); // 阻止滚动
+    const rect = canvas.getBoundingClientRect();
+    const touch = e.touches[0];
+    const x = (touch.clientX - rect.left) * (canvas.width / rect.width);
+    const y = (touch.clientY - rect.top) * (canvas.height / rect.height);
+    handleSelect(x, y);
+  }
+}, { passive: false });
+
+function resetSelection() {
+  selectedCells.clear();
+  document.getElementById('message').innerText = '';
+  draw();
+}
+
+function markNoTarget() {
+  selectedCells.clear();
+  submitSelection();
+}
+
+function submitSelection() {
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+
+  if (!hasTarget && selectedCells.size > 0) {
+    document.getElementById('message').innerText = '本图无目标，请取消所有选择（或点击“本图无目标”按钮）再提交。';
+    setTimeout(() => { btn.disabled = false; }, 600);
+    return;
+  }
+
+  fetch(`/validate?user=${encodeURIComponent(user_id)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ image_name, selected_cells: Array.from(selectedCells)})
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.all_correct) {
+      document.getElementById('message').innerText = '';
+      loadNext();
+    } else {
+      const missing = data.missing.length;
+      const extra = data.extra.length;
+      document.getElementById('message').innerText =
+        `还未全部正确：缺少 ${missing} 个，多选 ${extra} 个，请继续选择。`;
+      setTimeout(() => { btn.disabled = false; }, 800);
+    }
+  })
+  .catch(() => {
+    document.getElementById('message').innerText = '提交失败，请重试';
+    setTimeout(() => { btn.disabled = false; }, 600);
+  });
+}
+
+function loadNext() {
+  fetch(`/next_image?user=${encodeURIComponent(user_id)}`)
+    .then(res => res.json())
+    .then(data => {
+      if (data.done) {
+        document.getElementById('progress').innerText = `任务完成（共 ${total} 张）`;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        return;
+      }
+      image_name = data.image_name;
+      current = data.current;
+      total = data.total;
+
+      document.getElementById('progress').innerText =
+        `当前为第 ${current} / ${total} 张（剩余 ${total - current} 张）`;
+
+      selectedCells.clear();
+      hasTarget = !!data.has_target;
+      document.getElementById('noTargetHint').style.display = hasTarget ? 'none' : 'block';
+      document.getElementById('noTargetActions').style.display = hasTarget ? 'none' : 'flex';
+
+      img.onload = draw;
+      img.src = data.image;
+
+      const btn = document.getElementById('submitBtn');
+      btn.disabled = false;
+
+      startCountdown();
+    });
+}
+</script>
+</body>
+</html>
