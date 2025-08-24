@@ -1,6 +1,6 @@
 # cam_grid9
 
-该项目需要在腾讯云上面运行。运行环境：Ubuntu系统、Python3.12。
+该项目需要在腾讯云(https://console.cloud.tencent.com/lighthouse/instance/index?rid=8)上面运行。运行环境：Ubuntu系统、Python3.12。 
 
 ## 在安装腾讯云时遇到的问题
 
