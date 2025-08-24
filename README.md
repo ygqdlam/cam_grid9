@@ -14,11 +14,11 @@ python3 -m venv venv
 ```bash
 source venv/bin/activate
 ```
-3.退出虚拟环境（用完之后可以输入）：
+3. 退出虚拟环境（用完之后可以输入）：
 ```bash
 deactivate
 ```
-4、需要下载以下依赖：
+4. 需要下载以下依赖：
 ```bash
 Pillow、flask、numpy
 ```
