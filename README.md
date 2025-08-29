@@ -27,8 +27,15 @@ Pillow、flask、numpy
 ```bash
 nohup python app.py > output.log 2>&1 &
 ```
+  ⑥
+```bash
+ps aux | grep python
+```
+```bash
+ps -ef
+```
 
-  ⑥ 下载文件到本地：
+  ⑦ 下载文件到本地：
 ```bash
 scp ubuntu@XX.XXX.XXX.XXX:/home/ubuntu/point_label_app_grid9/annotations.csv /Users/yanggq/yanggq/伪装项目/annotations.csv
 ```
