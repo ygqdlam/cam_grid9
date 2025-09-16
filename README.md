@@ -46,7 +46,12 @@ lsof -i :8888
 ```bash
 scp ubuntu@XX.XXX.XXX.XXX:/home/ubuntu/point_label_app_grid9/annotations.csv /Users/yanggq/yanggq/伪装项目/annotations.csv
 ```
+  ⑨ 上传文件
+```bash
+scp "/Users/yanggq/yanggq/伪装项目/point_label_app_fixed_userid/student.xlsx" \
+    ubuntu@49.233.133.133:/home/ubuntu/
 
+```
 ### 3.遇到的一些报错
   ① 正在使用以下命令尝试通过 scp 上传文件：
 ```bash
