@@ -6,6 +6,15 @@
 
 ### 1. 端口号必须是8888，这个可以发布到公网的端口号是固定的，通过腾讯云查询。
 ### 2. 需要创建Python虚拟环境
+  0️⃣ 创建python
+```
+sudo apt install python3.12-venv --fix-missing
+
+# 添加deadsnakes PPA（包含多个Python版本）
+sudo add-apt-repository ppa:deadsnakes/ppa
+sudo apt update
+sudo apt install python3.12 python3.12-venv
+```
   ①  创建虚拟环境。在你的项目目录下（比如 ~/point_label_app_grid9），运行：
 ```bash
 python3 -m venv venv
